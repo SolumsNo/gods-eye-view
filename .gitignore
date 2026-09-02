@@ -10,3 +10,23 @@ output/
 .DS_Store
 .gstack/
 3d-models/
+
+# Solums Zeestar - lokale filer og hemmeligheter
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Backup-mapper laget av Zeestar-installerne
+.*-backup-*
+
+# Enkeltfiler laget som lokale sikkerhetskopier
+*.backup-*
+*.backup
+*.bak
+
+# Lokale rapportfiler
+.night-earth-removal-report.txt
+
+# Gamle lokale installasjonspakker / arbeidsmapper
+gods-eye-view-astro-weather/

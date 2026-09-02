@@ -829,6 +829,14 @@ export function createGevActionRunner({ viewer, styleManager, dataManager, scene
       );
     }
 
+    if (name === 'analyze_area') {
+      const api = window.__godsEyeView?.areaIntelligence;
+      if (!api?.analyzeCenter) {
+        return { ok: false, action: 'analyze_area', error: 'Area Intelligence is unavailable' };
+      }
+      return api.analyzeCenter({ open: args.openPanel !== false });
+    }
+
     if (name === 'get_entity_context') {
       return getEntityContext(viewer, dataManager, styleManager, args);
     }

@@ -44,6 +44,12 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { defineConfig, loadEnv } from 'vite';
 import cesium from 'vite-plugin-cesium';
+import { earthScienceProxy } from './earthScienceProxy.js';
+import { nightEarthDataProxy } from './nightEarthDataProxy.js';
+import { solumsGeocodeProxy } from './solumsGeocodeProxy.js';
+import { weather3DProxy } from './weather3DProxy.js';
+import { areaIntelProxy } from './areaIntelProxy.js';
+import { spaceLaunchUpcomingProxy } from './spaceLaunchProxy.js';
 import { normalizeRadioCountryInput } from './src/data/radioCountry.js';
 import {
   normalizeRegionalArticles,
@@ -5121,7 +5127,8 @@ function openAiRealtimeProxy() {
             'Call tools only for clear GEV control, navigation, visual-style, layer, or app-state requests. For ordinary conversation, answer normally without tools.',
             'For requests to open, show, reveal, or focus a menu/panel, call set_panel_open or show_data_layers_menu. "Open Context" means only set_panel_open{panelId:"global-context-panel",open:true}; it does not activate a Context sub-mode. "Open Contacts" means set_context_mode{mode:"contacts"}; that action expands the parent Context panel before activating Contacts.',
             'For requests like "show me the datacenter layers", open the data layers menu and focus the matching layer row; do not enable the layer unless the user asks to turn it on.',
-            'For questions like "what am I looking at?", "what is in view?", "what is this?", "that selected thing", nearby datacenter, dam, cable, ship, or current view contents, call get_entity_context first, then answer from the returned scene/entity context.',
+            'For questions like "what am I looking at?", "what is in view?", "what is this?", "that selected thing", nearby datacenter, dam, cable, ship, or current view contents, call get_entity_context first, then answer from the returned scene/entity context. For requests such as "analyze this area", "tell me everything about this area", "area intelligence", "what is this place known for?", or Norwegian equivalents like "analyser området" and "fortell meg alt om stedet", call analyze_area. Use its viewportAnalysis first: primaryArea, foreground, distance, left, right, visibleDistricts, and visibleLocalities describe the WHOLE visible map rather than one center point. Then use population, country facts, history/about text, weather, news, and live-layer summary; do not invent missing facts.',
+            'Treat natural Norwegian and English screen questions as the same scene-context request: "hva ser jeg?", "hva ser jeg på skjermen?", "hvilken by er dette?", "hvor er jeg?", "hva er den bygningen?", "hva er det flyet?", "what city is this?", "what building is that?", and "tell me about what I can see" MUST call get_entity_context first. If a viewport screenshot is attached, combine clearly legible visual evidence with basemap/scene context. Never guess an unreadable label; state uncertainty when the identification is not reliable.',
             'For "what is this aircraft?" answers, read the callsign, operator, registration, type, and route only from get_entity_context selected.properties. Treat route, routeOrigin, and routeDestination as the only authoritative route fields. Every aircraft identity answer MUST explicitly cover operator, type, and route. When a route is present, repeat its endpoint codes exactly; do not expand airport codes into city names. For a missing field say exactly "Operator details are unavailable", "Aircraft type is unavailable", or "Route details are unavailable" as applicable. Never silently omit missing enrichment or infer it from the callsign.',
             'While a camera motion or route flight is active, a bare "stop" means move_camera{motion:stop} — NOT control_scene and NOT stop_tracking (those need explicit words like "stop the scene" / "stop tracking"). If move_camera stop returns stopped:false and an entity is being tracked, call stop_tracking next — the user means "stop whatever is moving". Flying somewhere while tracking automatically stops the tracking (the result says so): mention it briefly.',
             'For camera-motion requests — "orbit around this", "pan left", "tilt up", "stop moving" — call move_camera. For "fly the route" over a drawn route, call fly_route. Confirm with the RESULTING state ("Orbiting slowly", "Flying the route").',
@@ -5165,6 +5172,7 @@ function openAiRealtimeProxy() {
             "After frame_overhead, speak ONLY from the tool result's count field — e.g. 'Framed fourteen aircraft, labels on'; never reassess or second-guess the count aloud.",
             'Confirmations echo the RESULTING state, never the request: "HUD operator layout", "Density twenty-five percent", "Bing aerial imagery", "Tracking UAL428", "Framed fourteen aircraft". On ok=false, state the failure plainly: "Nothing matched UAL999", "No ships within 120 kilometers". Never claim an action without ok=true in the tool result.',
             'For destination requests such as "take me to Italy", "go to NYC", or "show me the Eiffel Tower", call fly_to_location. Prefer known city IDs when available; otherwise pass the plain place query.',
+            'For descriptive destinations, resolve the real-world name first and then call fly_to_location in the SAME turn. Examples: "show me the capital of Norway" → query "Oslo, Norway"; "take me to the tallest mountain in the world" → query "Mount Everest"; "show me the famous opera house in Sydney" → query "Sydney Opera House". If the user asks to be taken somewhere, do not merely say where it is — move the camera.',
             'Navigation-only requests ("take me to X", "go to X", "fly to X") are NOT descriptions: call fly_to_location alone and do NOT also call annotate_map, unless the user explicitly asks to mark the place or you go on to explain specific places there. Never drop a point pin on a region-scale natural feature (a mountain range, desert, sea, or forest) — a single point in the middle of the Rockies is meaningless. If the user explicitly asks to mark such a region, prefer type=area.',
             'For country and city destinations, omit rangeM so GEV frames the whole country or city in view. For landmarks and buildings, omit rangeM so GEV chooses a close landmark view.',
             'Only supply rangeM when the user asks for a particular numeric height, distance, closer view, or wider view.',
@@ -5767,6 +5775,18 @@ const GEV_REALTIME_TOOLS = [
         },
       },
       required: ['style'],
+    },
+  },
+  {
+    type: 'function',
+    name: 'analyze_area',
+    description: 'Analyze the geographic area at the current map center and return place identity, population when available, nationality/demonym, country facts, encyclopedia history/context, current weather, recent location-matched headlines, and enabled live-layer statistics. Opens the Area Intelligence panel by default.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        openPanel: { type: 'boolean', description: 'Open the Area Intelligence panel. Defaults to true.' },
+      },
     },
   },
   {
@@ -7341,17 +7361,23 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       cesium(),
+      earthScienceProxy(),
+      nightEarthDataProxy(),
+solumsGeocodeProxy(),
       openSkyProxy(),
       celestrakProxy(),
       tomtomProxy(),
       firmsProxy(),
       rocketLaunchesProxy(),
+      spaceLaunchUpcomingProxy(),
       terrainHeightsProxy(),
       adsbdbProxy(),
       overpassProxy(),
       militaryInstallationsProxy(),
       regionalBriefProxy(),
+      areaIntelProxy(),
       weatherEffectsProxy(),
+      weather3DProxy(),
       cctvProxy(),
       radioBrowserProxy(),
       gbfsProxy(),

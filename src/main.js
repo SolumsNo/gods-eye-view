@@ -5,6 +5,8 @@ import { DataLayerManager } from './data/manager.js';
 import flightsLayer from './data/flights.js';
 import militaryFlightsLayer from './data/militaryFlights.js';
 import earthquakesLayer from './data/earthquakes.js';
+import astroWeatherLayer from './data/astroWeather.js';
+import { installAstroWeatherLayer } from './data/astroWeatherLayer.js';
 import satellitesLayer from './data/satellites.js';
 import rocketLaunchesLayer from './data/rocketLaunches.js';
 import trafficLayer from './data/traffic.js';
@@ -15,6 +17,7 @@ import aisLiveVesselsLayer from './data/aisLiveVessels.js';
 import militaryInstallationsLayer from './data/militaryInstallations.js';
 import militaryAwarenessLayer from './data/militaryAwareness.js';
 import localDataLayers from './data/localLayers.js';
+import astroModeLayer from './data/astroMode.js';
 import { LAYER_STATE_REGISTRY } from './data/layerState.js';
 import { registerDataCredits } from './data/dataCredits.js';
 import { SceneDirector } from './scenes/director.js';
@@ -23,6 +26,15 @@ import { MapStackController } from './mapStackController.js';
 import { initAnnotations } from './annotations/index.js';
 import { initLogoGaze } from './logoGaze.js';
 import { initCockpitCloudEffects } from './cockpitCloudEffects.js';
+import { initCinematicTrackingMode } from './cinematicTracking.js';
+import { initSpaceLaunchMode } from './spaceLaunchMode.js';
+import { initWeather3D } from './weather3D.js';
+import { initAreaIntelligence } from './areaIntelligence.js';
+import { initEarthScienceMode } from './earthScienceMode.js';
+import { initDayNightSunMoonSimulator } from './dayNightSunMoon.js';
+import { initNightEarthSafe } from './nightEarthSafe.js';
+import { initSolumsZeestarBranding } from './solumsZeestarBranding.js';
+import { initAstroWeatherPositionPatch } from './astroWeatherPositionPatch.js';
 import {
   installRenderGovernor,
   getRenderGovernorDiagnostics,
@@ -123,6 +135,9 @@ async function init() {
         },
       },
     });
+  installAstroWeatherLayer(viewer);
+
+
 
     // Cap the default render loop at 60 fps. Cesium's loop otherwise runs at
     // the display's refresh rate — 120 Hz on ProMotion panels — doubling GPU
@@ -157,9 +172,18 @@ async function init() {
     let tileset = null;
     try {
       // Load Google Photorealistic 3D Tiles
-      tileset = await Cesium.createGooglePhotorealistic3DTileset({
-        onlyUsingWithGoogleGeocoder: true,
-      });
+      // Google Photorealistic 3D via Cesium ion.
+      // Direct tile.googleapis.com requests can return 403 for EEA-linked
+      // Google Maps Platform projects. Cesium ion asset 2275207 provides the
+      // same Google Photorealistic 3D Tiles through the configured ion token.
+      tileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
+
+    // High-detail terrain / imagery when zooming in
+    tileset.maximumScreenSpaceError = 2.0;
+    tileset.dynamicScreenSpaceError = false;
+    tileset.foveatedScreenSpaceError = false;
+    tileset.preloadWhenHidden = true;
+
       viewer.scene.primitives.add(tileset);
       // NOTE: Cesium World Terrain intentionally disabled — conflicts with Google 3D Tiles at high zoom.
       // Google Photorealistic 3D Tiles provide their own terrain/elevation.
@@ -197,6 +221,7 @@ async function init() {
     // Cesium fog or post-process stages and is fully stopped in map mode.
     const weatherEffects = null;
     const cockpitCloudEffects = initCockpitCloudEffects(viewer);
+    const weather3D = initWeather3D({ viewer });
 
     // If no share link state, do default fly-to Austin
     if (!styleManager.hasShareState) {
@@ -213,6 +238,7 @@ async function init() {
     dataManager.register(flightsLayer);
     dataManager.register(militaryFlightsLayer);
     dataManager.register(earthquakesLayer);
+    dataManager.register(astroWeatherLayer);
     dataManager.register(satellitesLayer);
     dataManager.register(rocketLaunchesLayer);
     rocketLaunchesLayer.attachDataManager(dataManager);
@@ -223,6 +249,7 @@ async function init() {
     dataManager.register(aisLiveVesselsLayer);
     dataManager.register(militaryInstallationsLayer);
     dataManager.register(militaryAwarenessLayer);
+    dataManager.register(astroModeLayer);
     militaryAwarenessLayer.attachDataManager(dataManager);
     for (const layer of localDataLayers) {
       dataManager.register(layer);
@@ -241,6 +268,14 @@ async function init() {
     }
     dataManager.buildTogglePanel(document.getElementById('data-toggles'));
     styleManager.attachDataManager(dataManager);
+    const spaceLaunchMode = initSpaceLaunchMode({ viewer, dataManager });
+    const areaIntelligence = initAreaIntelligence({ viewer, dataManager });
+    const earthScience = initEarthScienceMode({ viewer });
+    const dayNightSunMoon = initDayNightSunMoonSimulator({ viewer });
+    const nightEarthSafe = initNightEarthSafe({ viewer, dataManager });
+const solumsZeestarBranding = initSolumsZeestarBranding();
+    const astroWeatherPosition = initAstroWeatherPositionPatch();
+    const cinematicTracking = initCinematicTrackingMode({ viewer, dataManager });
 
     // Initialize deterministic scene playback for social clip capture
     const sceneDirector = new SceneDirector(viewer, styleManager, dataManager);
@@ -321,6 +356,15 @@ async function init() {
       annotations,
       weatherEffects,
       cockpitCloudEffects,
+      cinematicTracking,
+      spaceLaunchMode,
+      weather3D,
+      areaIntelligence,
+      earthScience,
+      dayNightSunMoon,
+      nightEarthSafe,
+solumsZeestarBranding,
+      astroWeatherPosition,
       getRenderGovernorDiagnostics,
       requestRender: governorRequestRender,
     };
