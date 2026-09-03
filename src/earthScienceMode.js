@@ -3,7 +3,7 @@ import * as Cesium from 'cesium';
 const PANEL_ID='sz-earth-science-panel';
 const BUTTON_ID='sz-earth-science-button';
 const STYLE_ID='sz-earth-science-style';
-const SOURCE_NAME='Solums Zeestar Earth Science';
+const SOURCE_NAME='Solums Skynet Spysat Earth Science';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const deg=r=>Cesium.Math.toDegrees(r);

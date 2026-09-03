@@ -1,7 +1,7 @@
 import * as Cesium from 'cesium';
 
 /**
- * SOLUMS ZEESTAR — DAY/NIGHT + SUN/MOON SIMULATOR v1.4
+ * SOLUMS SKYNET SPYSAT — DAY/NIGHT + SUN/MOON SIMULATOR v1.4
  *
  * MAP-SAFE DESIGN
  * - Does NOT modify Google Photorealistic 3D selection
@@ -21,7 +21,7 @@ import * as Cesium from 'cesium';
 const PANEL_ID = 'sz-day-night-panel';
 const BUTTON_ID = 'sz-day-night-button';
 const STYLE_ID = 'sz-day-night-style';
-const SOURCE_NAME = 'Solums Zeestar Day Night Simulator';
+const SOURCE_NAME = 'Solums Skynet Spysat Day Night Simulator';
 
 const SPEEDS = [1, 60, 600, 3600, 14400];
 

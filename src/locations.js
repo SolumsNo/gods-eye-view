@@ -353,7 +353,7 @@ export async function searchAndFlyTo(viewer, query, options = {}) {
   const beforeFly = typeof options.beforeFly === 'function' ? options.beforeFly : null;
   const mayFly = () => beforeFly === null || beforeFly() !== false;
 
-  // Solums Zeestar global place resolution:
+  // Solums Skynet Spysat global place resolution:
   // use Google's normal geocoder when available, then fall back to a no-key
   // OpenStreetMap/Nominatim lookup if Geocoding is unavailable or misses.
   let result = null;

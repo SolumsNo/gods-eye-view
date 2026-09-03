@@ -1,7 +1,7 @@
 import * as Cesium from 'cesium';
 
 /**
- * SOLUMS ZEESTAR — NIGHT EARTH / DARK SKY SAFE v1.1
+ * SOLUMS SKYNET SPYSAT — NIGHT EARTH / DARK SKY SAFE v1.1
  *
  * HARD SAFETY CONTRACT:
  * This module never modifies the base map, Google 3D or Visual Presets.
@@ -11,7 +11,7 @@ import * as Cesium from 'cesium';
 const PANEL_ID = 'sz-night-earth-safe-panel';
 const BUTTON_ID = 'sz-night-earth-safe-button';
 const STYLE_ID = 'sz-night-earth-safe-style';
-const DATA_SOURCE_NAME = 'Solums Zeestar Dark Sky Overlay';
+const DATA_SOURCE_NAME = 'Solums Skynet Spysat Dark Sky Overlay';
 
 const DEFAULT_DAYS_AGO = 4;
 const MIN_DAYS_AGO = 2;

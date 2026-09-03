@@ -5,10 +5,10 @@ export const config = {
 };
 
 function requireLogin() {
-  return new Response('Solums Zeestar - innlogging kreves.', {
+  return new Response('Solums Skynet Spysat - innlogging kreves.', {
     status: 401,
     headers: {
-      'WWW-Authenticate': 'Basic realm="Solums Zeestar", charset="UTF-8"',
+      'WWW-Authenticate': 'Basic realm="Solums Skynet Spysat", charset="UTF-8"',
       'Cache-Control': 'no-store',
       'X-Robots-Tag': 'noindex, nofollow, noarchive',
     },
@@ -20,7 +20,7 @@ export default function middleware(request: Request) {
   const password = process.env.ZEESTAR_AUTH_PASSWORD;
 
   if (!username || !password) {
-    return new Response('Solums Zeestar authentication is not configured.', {
+    return new Response('Solums Skynet Spysat authentication is not configured.', {
       status: 503,
       headers: {
         'Cache-Control': 'no-store',

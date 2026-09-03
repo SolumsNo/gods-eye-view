@@ -1,5 +1,5 @@
 /**
- * Solums Zeestar Night Earth SAFE v1.2
+ * Solums Skynet Spysat Night Earth SAFE v1.2
  *
  * IMPORTANT:
  * - Uses ongoing NASA Black Marble / VIIRS nighttime-radiance layers.

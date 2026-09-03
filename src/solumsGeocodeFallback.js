@@ -1,5 +1,5 @@
 /**
- * Solums Zeestar — global geocoding fallback.
+ * Solums Skynet Spysat — global geocoding fallback.
  * Returns a Google-Geocoding-compatible result for the existing searchAndFlyTo camera logic.
  */
 

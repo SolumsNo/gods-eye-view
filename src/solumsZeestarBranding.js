@@ -1,8 +1,8 @@
 /**
- * Solums Zeestar branding patch for God's Eye View.
+ * Solums Skynet Spysat branding patch for God's Eye View.
  *
  * Rebrands the UI to:
- *   SOLUMS ZEESTAR · LEVEL 114534345,6
+ *   SOLUMS SKYNET SPYSAT · LEVEL 114534345,6
  *   ASTRO · AIR · SEA · SPACE
  *
  * It also swaps the little turquoise globe motif for a neon eye icon when it
@@ -13,9 +13,9 @@
 const STYLE_ID = 'solums-zeestar-brand-style';
 const FALLBACK_BADGE_ID = 'solums-zeestar-brand-badge';
 
-const BRAND_TITLE = 'SOLUMS ZEESTAR · LEVEL 114534345,6';
+const BRAND_TITLE = 'SOLUMS SKYNET SPYSAT · LEVEL 114534345,6';
 const BRAND_SUBTITLE = 'ASTRO · AIR · SEA · SPACE';
-const WINDOW_TITLE = 'Solums Zeestar · Level 114534345,6';
+const WINDOW_TITLE = 'Solums Skynet Spysat · Level 114534345,6';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -259,7 +259,7 @@ function patchTextsInPlace() {
   for (const textNode of nodes) {
     const parent = textNode.parentElement;
     if (!parent || parent.closest('.solums-zeestar-brand-text, #' + FALLBACK_BADGE_ID)) continue;
-    const next = phrases.reduce((acc, phrase) => acc.replaceAll(phrase, 'Solums Zeestar'), textNode.nodeValue);
+    const next = phrases.reduce((acc, phrase) => acc.replaceAll(phrase, 'Solums Skynet Spysat'), textNode.nodeValue);
     textNode.nodeValue = next;
   }
 }
