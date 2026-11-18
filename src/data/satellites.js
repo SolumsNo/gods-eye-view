@@ -32,6 +32,7 @@ import {
 } from './contextStore.js';
 import { holdContinuousRender, releaseContinuousRender } from '../renderGovernor.js';
 import { isExplicitLayerStateOrigin } from './layerState.js';
+import { ORBIT_SAMPLE_LENGTH, reckonEarthFixed, sampleFromState, sampleOrbit } from './satelliteMotion.js';
 
 /**
  * Satellite Orbits — Real-time positions via CelesTrak TLE + SGP4 propagation.
@@ -62,6 +63,9 @@ let _overlayHost = DEFAULT_OVERLAY_HOST;
 const ORBIT_PATH_STEPS = 180;  // points per orbital path
 const POSITION_UPDATE_MS = 1000; // re-propagate every 1s (SGP4 is smooth at this rate)
 const RING_ROTATION_MS = 1000;   // re-align baked orbit rings to current GMST every 1s
+const ORBIT_SAMPLE_HORIZON_MS = 30_000;
+const ORBIT_RECKON_LIMIT_MS = 30_000;
+const _scratchSatellitePosition = new Cesium.Cartesian3();
 
 /**
  * CelesTrak groups loaded as the core catalog, in dedupe-priority order:
@@ -474,10 +478,11 @@ function parseTLE(text) {
  * Returns geodetic position plus inertial speed from the same SGP4 propagation
  * epoch, or null on error.
  */
-function propagatePosition(satrec, date) {
+function propagatePosition(satrec, date, orbitSample = null) {
   try {
     const posVel = propagate(satrec, date);
     if (!posVel.position || typeof posVel.position === 'boolean') return null;
+    if (orbitSample) sampleFromState(posVel, date.getTime(), orbitSample);
 
     const gmst = gstime(date);
     const geo = eciToGeodetic(posVel.position, gmst);
@@ -1024,27 +1029,16 @@ function _trackSatellite(noradId, { origin = 'programmatic' } = {}) {
 }
 
 /**
- * Propagate all CORE satellite positions and update point primitives.
- * (~840 sats ≈ 1.6 ms/pass — fine at the 1s/200ms cadence.) Dense extras are
- * excluded: they refresh on the round-robin budget in _propagateDenseChunk.
+ * Take fresh SGP4 samples of the CORE satellites. Their visible points are
+ * reckoned from these samples on every pre-render frame.
  */
-function _propagateAll() {
-  const now = new Date();
+function _propagateAll(nowMs = Date.now()) {
   let updated = 0;
-
-  for (const [noradId, sat] of _catalog) {
+  for (const sat of _catalog.values()) {
     if (sat.group === 'dense') continue;
-    const pos = propagatePosition(sat.satrec, now);
-    if (!pos) continue;
-
-    const cartesian = Cesium.Cartesian3.fromDegrees(pos.longitude, pos.latitude, pos.altitude);
-    const point = _points.get(noradId);
-    if (point) {
-      point.position = cartesian;
-      updated++;
-    }
+    sat.orbitSample ||= new Float64Array(ORBIT_SAMPLE_LENGTH);
+    if (sampleOrbit(sat.satrec, nowMs, sat.orbitSample)) updated++;
   }
-
   return updated;
 }
 
@@ -1056,21 +1050,40 @@ function _propagateAll() {
  * work per frame avoids the once-per-second spike a tick-sized chunk
  * (~2K props ≈ 4ms) would cause.
  */
-function _propagateDenseChunk() {
+function _propagateDenseChunk(nowMs = Date.now()) {
   if (_denseIds.length === 0) return;
   const perFrame = Math.max(1, Math.ceil(_denseIds.length / DENSE_REFRESH_FRAMES));
-  const now = new Date();
   for (let i = 0; i < perFrame; i++) {
     if (_denseCursor >= _denseIds.length) _denseCursor = 0;
     const noradId = _denseIds[_denseCursor++];
     if (noradId === _trackedNorad) continue; // per-frame tracked path owns it
     const sat = _catalog.get(noradId);
+    if (!sat) continue;
+    sat.orbitSample ||= new Float64Array(ORBIT_SAMPLE_LENGTH);
+    sampleOrbit(sat.satrec, nowMs, sat.orbitSample);
+  }
+}
+
+/**
+ * Move shown, untracked points from their latest SGP4 samples each frame.
+ * Dense points retain their bounded round-robin sampling budget.
+ */
+function _reckonPoints(nowMs) {
+  const gmst = gstime(new Date(nowMs));
+  for (const [noradId, sat] of _catalog) {
     const point = _points.get(noradId);
-    if (!sat || !point) continue;
-    const pos = propagatePosition(sat.satrec, now);
-    if (pos) {
-      point.position = Cesium.Cartesian3.fromDegrees(pos.longitude, pos.latitude, pos.altitude);
+    if (!point || point.show === false || noradId === _trackedNorad) continue;
+    if (sat.reckonedAtMs === nowMs) continue;
+
+    let sample = sat.orbitSample;
+    if (sat.group !== 'dense' && (!sample || Math.abs(nowMs - sample[0]) > ORBIT_SAMPLE_HORIZON_MS)) {
+      sat.orbitSample ||= new Float64Array(ORBIT_SAMPLE_LENGTH);
+      sample = sampleOrbit(sat.satrec, nowMs, sat.orbitSample);
     }
+    if (!sample || Math.abs(nowMs - sample[0]) > ORBIT_RECKON_LIMIT_MS) continue;
+
+    point.position = reckonEarthFixed(sample, nowMs, gmst, _scratchSatellitePosition);
+    sat.reckonedAtMs = nowMs;
   }
 }
 
@@ -1122,10 +1135,11 @@ async function _loadDenseCatalog({ signal = null } = {}) {
         if (!satrec || satrec.error !== 0) continue;
         const noradId = Number(satrec.satnum);
         if (_catalog.has(noradId)) continue; // core catalog keeps priority
-        const pos = propagatePosition(satrec, now);
+        const orbitSample = new Float64Array(ORBIT_SAMPLE_LENGTH);
+        const pos = propagatePosition(satrec, now, orbitSample);
         if (!pos) continue;
 
-        _catalog.set(noradId, { name: entry.name, satrec, group: 'dense' });
+        _catalog.set(noradId, { name: entry.name, satrec, group: 'dense', orbitSample });
         const point = _pointCollection.add({
           position: Cesium.Cartesian3.fromDegrees(pos.longitude, pos.latitude, pos.altitude),
           pixelSize: style.pixelSize,
@@ -1229,11 +1243,14 @@ function _preRenderTick() {
   // one-second propagation cadence: that GPU upload presented as a periodic
   // whole-globe pulse even though the camera remained stationary.
   if (_params.showPoints && now - _lastPropagation >= interval) {
-    _propagateAll();
+    _propagateAll(now);
     _lastPropagation = now;
   }
 
-  if (_params.showPoints) _propagateDenseChunk();
+  if (_params.showPoints) {
+    _propagateDenseChunk(now);
+    _reckonPoints(now);
+  }
 
   // Keep the tracked dot on the per-frame epoch shared with label + camera —
   // runs after _propagateAll so the per-frame sample wins over the 200ms one.
@@ -1706,14 +1723,16 @@ const satellitesLayer = {
         seen.add(noradId);
 
         // Store in catalog
+        const orbitSample = new Float64Array(ORBIT_SAMPLE_LENGTH);
         _catalog.set(noradId, {
           name: entry.name,
           satrec,
           group: entry.group,
+          orbitSample,
         });
 
-        // Propagate initial position
-        const pos = propagatePosition(satrec, now);
+        // Propagate initial position, retaining the SGP4 sample for interpolation.
+        const pos = propagatePosition(satrec, now, orbitSample);
         if (!pos) continue;
 
         const cartesian = Cesium.Cartesian3.fromDegrees(pos.longitude, pos.latitude, pos.altitude);
