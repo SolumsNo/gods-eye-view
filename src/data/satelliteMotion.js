@@ -13,15 +13,19 @@ export function sampleFromState(state, atMs, out = new Float64Array(ORBIT_SAMPLE
 
   const k = -MU_KM3_S2 / (r * r * r);
   const radial = 3 * (p.x * v.x + p.y * v.y + p.z * v.z) / (r * r);
-  out.set([
-    atMs,
-    p.x, p.y, p.z,
-    v.x, v.y, v.z,
-    k * p.x, k * p.y, k * p.z,
-    k * (v.x - radial * p.x),
-    k * (v.y - radial * p.y),
-    k * (v.z - radial * p.z),
-  ]);
+  out[0] = atMs;
+  out[1] = p.x;
+  out[2] = p.y;
+  out[3] = p.z;
+  out[4] = v.x;
+  out[5] = v.y;
+  out[6] = v.z;
+  out[7] = k * p.x;
+  out[8] = k * p.y;
+  out[9] = k * p.z;
+  out[10] = k * (v.x - radial * p.x);
+  out[11] = k * (v.y - radial * p.y);
+  out[12] = k * (v.z - radial * p.z);
   return out;
 }
 
